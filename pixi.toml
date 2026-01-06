@@ -24,7 +24,7 @@ env.RESULTS = "${PIXI_PROJECT_ROOT}/data/results"
 env.SCRIPTS = "${PIXI_PROJECT_ROOT}/workflow/scripts"
 
 [dependencies]
-python = ">=3.11"
+python = "3.11.*"
 ipython = "*"
 ipykernel = "*"
 jupyterlab = "*"
