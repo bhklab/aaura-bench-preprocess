@@ -17,3 +17,7 @@ Columns that will need to be calculated in addition are:
 * largest_slice_index
 * lesion_location
 * source (Optional, mostly used for datasets composed of multiple other datasets)
+
+## Mask indexing for saving starting at 1 to reflect labels
+*2026-01-07*  
+Starting the mask labelling at 1 to reflect the voxel values they were in the original image. 0 is reserved for background.
