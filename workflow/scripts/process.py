@@ -48,7 +48,8 @@ def get_rerecist_coords(mask:MedImage) -> np.array:
 	return rerecist_coords, max_axial_index
 
 
-def image_proc(image_path:Path) -> MedImage:
+def image_proc(image_path:Path,
+			   proc_path_stem:str|None = None) -> dict:
 	"""Process image for use in the AAuRA Benchmarking tool 
 	
 	Parameters
@@ -68,10 +69,26 @@ def image_proc(image_path:Path) -> MedImage:
 	# Convert to MedImage
 	image = MedImage(image)
 
-	return image
+	if proc_path_stem is not None:
+		proc_image_path = dirs.PROCDATA / proc_path_stem / 'CT.nii.gz'
+		if not proc_image_path.parent.exists():
+			proc_image_path.parent.mkdir(parents=True, exist_ok=True)
+		sitk.WriteImage(image, str(proc_image_path))
+		logger.info(f'Processed image saved at: {proc_image_path}')
+
+	# Get image metadata
+	image_metadata = image.fingerprint
+	# Convert size, spacing, origin, direction to tuples/lists for JSON serialization
+	image_metadata["size"] = image.size.to_tuple()
+	image_metadata["spacing"] = image.spacing.to_tuple()
+	image_metadata["origin"] = image.origin.to_tuple()
+	image_metadata["direction"] = image.direction.to_matrix()
+
+	return image_metadata
 
 
-def mask_proc(mask_path):
+def mask_proc(mask_path:Path,
+			  proc_path_stem:str|None = None) -> dict:
 	"""Process mask for use in the AAuRA Benchmarking tool
 
 	Parameters
@@ -89,12 +106,45 @@ def mask_proc(mask_path):
 	# Cast mask to UInt8
 	mask = sitk.Cast(mask, sitk.sitkUInt8)
 
-	# TODO: Find the maximum pixel value, this will be the number of volumes, make a little roi mapping then go back to using VectorMask
+	# Convert mask to numpy array to check unique labels
+	label_array = sitk.GetArrayFromImage(mask)
+	unique_labels = np.unique(label_array)
 
-	# Convert to MedImageTools Mask
-	mask = Mask(mask, metadata={"mask.ndim": 3})
+	if len(unique_labels) == 1:
+		logger.info(f'Mask at {mask_path} has no labelled volumes.')
+		raise ValueError('Mask has no labelled volumes.')
+	
+	else:
+		proc_mask_metadata = {}
+		logger.info(f'Mask at {mask_path} has {len(unique_labels)-1} labelled volumes.')
+		for volume_idx in range(1, len(unique_labels)):
+			# Extract the volume with the current label (volume_idx)
+			idx_mask = (label_array == (volume_idx)).astype(np.uint8)
 
-	return mask
+			# Convert the extracted volume back to a sitk.Image
+			idx_mask_sitk = sitk.GetImageFromArray(idx_mask)
+			# Copy the metadata from the original mask
+			idx_mask_sitk.CopyInformation(mask)
+			# Convert to MedImageTools Mask
+			idx_mask_mi = Mask(idx_mask_sitk, metadata={"mask.ndim": 3})
+			idx_mask_metadata = idx_mask_mi.fingerprint
+
+			# Write out the individual mask volume
+			if proc_path_stem is not None:
+				proc_mask_path = dirs.PROCDATA / proc_path_stem / f'mask_{volume_idx}.nii.gz'
+				if not proc_mask_path.parent.exists():
+					proc_mask_path.parent.mkdir(parents=True, exist_ok=True)
+				sitk.WriteImage(idx_mask_sitk, str(proc_mask_path))
+				logger.info(f'Processed mask volume {volume_idx} saved at: {proc_mask_path}')
+			
+			# Get RERECIST coords for current volume
+			rerecist_coords, max_axial_index = get_rerecist_coords(idx_mask_mi)
+			idx_mask_metadata["annotation_coords"] = rerecist_coords
+			idx_mask_metadata["largest_slice_index"] = int(max_axial_index)
+
+			proc_mask_metadata[f"{volume_idx}"] = idx_mask_metadata
+
+		return proc_mask_metadata
 
 
 def process_one(sample:pd.Series,
@@ -106,50 +156,29 @@ def process_one(sample:pd.Series,
 	image_path = Path(dataset) / timepoint / 'images' / f'{id}_0000.nii.gz'
 	mask_path = Path(dataset) / timepoint / 'labels' / f'{id}.nii.gz'
 
+	proc_path_stem = Path(dataset, "images", timepoint, id)
 	# Process image
-	image = image_proc(dirs.RAWDATA / image_path)
-	mask = mask_proc(dirs.RAWDATA / mask_path)
+	image_metadata = image_proc(dirs.RAWDATA / image_path, proc_path_stem)
+	masks_metadata = mask_proc(dirs.RAWDATA / mask_path, proc_path_stem)
 	logger.info(f'Image and mask loaded for sample: {id}')
 
-	if mask.volume_count > 1:
-		logger.warning(f'Sample {id} has more than one volume in the mask. Current volume count: {mask.volume_count}')
-		raise NotImplementedError('VectorMask processing not implemented yet.')
-	
-		#TODO: Multiple ROI handling
-	else:		
-		# Get RERECIST coords from mask
-		logger.info(f'Extracting RERECIST coordinates from mask for sample: {id}')
-		rerecist_coords, max_axial_index = get_rerecist_coords(mask)
-
-	# Save out processed image and mask
-	proc_path_stem = Path(dataset, "images", timepoint, id)
-	proc_image_path = dirs.PROCDATA / proc_path_stem / 'CT.nii.gz'
-	# TODO: update this when multiple mask handling implemented, need to label it as mask_0, mask_1, etc.
-	proc_mask_path = dirs.PROCDATA / proc_path_stem / 'mask_0.nii.gz'
-
-	if not proc_image_path.parent.exists():
-		proc_image_path.parent.mkdir(parents=True, exist_ok=True)
-	if not proc_mask_path.parent.exists():
-		proc_mask_path.parent.mkdir(parents=True, exist_ok=True)
-	
-	sitk.WriteImage(image, str(proc_image_path))
-	sitk.WriteImage(mask, str(proc_mask_path))
-	logger.info(f'Processed image and mask saved for sample: {id}')
-
-	sample_index = {"id": id,
-					"image_path": proc_path_stem / 'CT.nii.gz',
-					"mask_path": proc_path_stem / 'mask.nii.gz',
-					"annotation_type": "RERECIST",
-					"annotation_coords": rerecist_coords,
-					"largest_slice_index": int(max_axial_index),
-					"size": image.size.to_tuple(),
-					"spacing": image.spacing.to_tuple(),
-					"origin": image.origin.to_tuple(),
-					"direction": image.direction.to_matrix(),
-					"mask_volume": mask.fingerprint["sum"],
-					"lesion_location": None,
-					"source": None
-					}
+	sample_index = {}
+	for mask_key, mask_metadata in masks_metadata.items():
+		sample_index[f"{id}_{mask_key}"] = {"id": id,
+									  		"image_path": proc_path_stem / 'CT.nii.gz',
+									  		"mask_path": proc_path_stem / f'mask_{mask_key}.nii.gz',
+											"mask_idx": int(mask_key),
+									  		"annotation_type": "RERECIST",
+											"annotation_coords": mask_metadata["annotation_coords"],
+											"largest_slice_index": mask_metadata["largest_slice_index"],
+											"size": image_metadata["size"],
+											"spacing": image_metadata["spacing"],
+											"origin": image_metadata["origin"],
+											"direction": image_metadata["direction"],
+											"mask_volume": mask_metadata["sum"],
+											"lesion_location": None,
+											"source": sample['Source']
+											}
 
 	return sample_index
 
@@ -196,25 +225,23 @@ def process(dataset:str,
 	for timepoint in timepoints:
 		logger.info(f'Processing timepoint: {timepoint}')
 
+		dataset_index = {}
 		try:
-			dataset_index = [
-				process_one(
-					sample=sample,
-					dataset=dataset,
-					timepoint=timepoint
-				)
-				for _, sample in metadata.iterrows()
-			]
+			for _, sample in metadata.iterrows():
+				dataset_index.update(process_one(sample=sample,
+												 dataset=dataset,
+												 timepoint=timepoint)
+									)					
 		except Exception as e:
 			message = 'Error processing image data.'
 			logger.error(message)
 			raise e
 		
 		# Convert dataset index to DataFrame
-		dataset_index_df = pd.DataFrame(dataset_index)
+		dataset_index_df = pd.DataFrame.from_dict(dataset_index, orient='index')
 
 		# Add the source and lesion location columns
-		dataset_index_df['source'] = metadata['Source'].values
+		# dataset_index_df['source'] = metadata['Source'].values
 
 		if anatomy_match_file is not None:
 			# Map lesion location using anatomy match file
@@ -224,6 +251,8 @@ def process(dataset:str,
 
 		# Save out dataset index
 		index_save_path = dirs.PROCDATA / dataset / "images" / timepoint / f'{timepoint}_aaura_index.csv'
+		if not index_save_path.parent.exists():
+			index_save_path.parent.mkdir(parents=True, exist_ok=True)
 		dataset_index_df.to_csv(index_save_path, index=False)
 
 	return dataset_index_df
