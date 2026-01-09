@@ -6,6 +6,7 @@ import SimpleITK as sitk
 from imgtools.coretypes import MedImage, Mask, VectorMask
 from pathlib import Path
 from skimage.measure import regionprops
+from tqdm import tqdm
 from damply import dirs
 
 logging.basicConfig(
@@ -153,8 +154,8 @@ def process_one(sample:pd.Series,
 	id = sample['File Name']
 	logger.info(f'Processing sample: {id}')
 
-	image_path = Path(dataset) / timepoint / 'images' / f'{id}_0000.nii.gz'
-	mask_path = Path(dataset) / timepoint / 'labels' / f'{id}.nii.gz'
+	image_path = Path(dataset) / 'images' / timepoint / 'images' / f'{id}_0000.nii.gz'
+	mask_path = Path(dataset) / 'images' / timepoint / 'labels' / f'{id}.nii.gz'
 
 	proc_path_stem = Path(dataset, "images", timepoint, id)
 	# Process image
@@ -229,7 +230,7 @@ def process(dataset:str,
 
 		dataset_index = {}
 		try:
-			for _, sample in metadata.iterrows():
+			for _, sample in tqdm(metadata.iterrows(), desc=f"Processing {timepoint} images for AAuRA...", total=len(metadata)):
 				dataset_index.update(process_one(sample=sample,
 												 dataset=dataset,
 												 timepoint=timepoint)
@@ -280,7 +281,7 @@ def process(dataset:str,
 if __name__ == '__main__':
 	logger.info('Starting data processing for LesionLocator')
 	process(dataset="CVPR_LesionLocator",
-		    metadata_file=Path("naming_1.csv"),
-			anatomy_match_file=Path("dataset_anatomy_match.csv"),
+		    metadata_file=Path("images/naming.csv"),
+			anatomy_match_file=Path("metadata/dataset_anatomy_match.csv"),
 			drop_data=['coronacases','NIH-LYMPH'],
 			append_index=False)
