@@ -159,8 +159,9 @@ def process_one(sample:pd.Series,
 	proc_path_stem = Path(dataset, "images", timepoint, id)
 	# Process image
 	image_metadata = image_proc(dirs.RAWDATA / image_path, proc_path_stem)
+	logger.info(f'Image loaded, processed, and saved for sample: {id}')
 	masks_metadata = mask_proc(dirs.RAWDATA / mask_path, proc_path_stem)
-	logger.info(f'Image and mask loaded for sample: {id}')
+	logger.info(f'Mask loaded, processed, and saved for sample: {id}')
 
 	sample_index = {}
 	for mask_key, mask_metadata in masks_metadata.items():
@@ -186,7 +187,8 @@ def process_one(sample:pd.Series,
 def process(dataset:str,
 			metadata_file:Path = None,
 			anatomy_match_file:Path = None,
-			drop_data:list = None
+			drop_data:list = None,
+			append_index:bool = False
 			) -> pd.DataFrame:
 	"""Process the specified dataset for use in the AAuRA Benchmarking tool
 	
@@ -240,19 +242,36 @@ def process(dataset:str,
 		# Convert dataset index to DataFrame
 		dataset_index_df = pd.DataFrame.from_dict(dataset_index, orient='index')
 
-		# Add the source and lesion location columns
-		# dataset_index_df['source'] = metadata['Source'].values
-
 		if anatomy_match_file is not None:
 			# Map lesion location using anatomy match file
 			# If 'Source' value contains one of the 'Dataset' values, map the corresponding 'Anatomy' value
 			for _, source_dataset in anatomy_match.iterrows():
 				dataset_index_df.loc[dataset_index_df['source'].str.contains(source_dataset['Dataset']), 'lesion_location'] = source_dataset['Anatomy']
 
-		# Save out dataset index
+		# Set up output path for index file
 		index_save_path = dirs.PROCDATA / dataset / "images" / timepoint / f'{timepoint}_aaura_index.csv'
 		if not index_save_path.parent.exists():
 			index_save_path.parent.mkdir(parents=True, exist_ok=True)
+
+		# Check if index file already exists
+		if index_save_path.exists():
+			logger.info(f'Index file already exists at: {index_save_path}')
+			if append_index:
+				logger.info(f'Appending to existing index file at: {index_save_path}')
+				# Load in the existing index file
+				existing_index_df = pd.read_csv(index_save_path)
+				# Append new index to existing index, keeping new index entries
+				dataset_index_df = pd.concat([existing_index_df, dataset_index_df], ignore_index=True)
+				# Drop duplicate entries based on id, image_path, and mask_idx, keeping the last occurrence
+				dataset_index_df = dataset_index_df.drop_duplicates(subset=['id','image_path','mask_path','mask_idx'],keep='last', ignore_index=True)
+				# Sort the index by id and mask_idx
+				dataset_index_df = dataset_index_df.sort_values(by=['id', 'mask_idx'], ignore_index=True)
+
+			else:
+				# If append is not specified, will overwrite existing index file
+				logger.info(f'Overwriting existing index file at: {index_save_path}')
+
+		# Save out the index file
 		dataset_index_df.to_csv(index_save_path, index=False)
 
 	return dataset_index_df
@@ -263,4 +282,5 @@ if __name__ == '__main__':
 	process(dataset="CVPR_LesionLocator",
 		    metadata_file=Path("naming_1.csv"),
 			anatomy_match_file=Path("dataset_anatomy_match.csv"),
-			drop_data=['coronacases'])
+			drop_data=['coronacases','NIH-LYMPH'],
+			append_index=False)
