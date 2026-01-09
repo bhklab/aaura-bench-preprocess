@@ -143,7 +143,7 @@ def process(dataset:str,
 				dataset_index_df.loc[dataset_index_df['source'].str.contains(source_dataset['Dataset']), 'lesion_location'] = source_dataset['Anatomy']
 
 		# Set up output path for index file
-		index_save_path = dirs.PROCDATA / dataset / "images" / timepoint / f'{timepoint}_aaura_index.csv'
+		index_save_path = dirs.PROCDATA / dataset / "images" / timepoint / f'aaura_{timepoint}_index.csv'
 		if not index_save_path.parent.exists():
 			index_save_path.parent.mkdir(parents=True, exist_ok=True)
 
