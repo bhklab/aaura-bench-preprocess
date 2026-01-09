@@ -60,6 +60,8 @@
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#mask-indexing-for-saving-starting-at-1-to-reflect-labels">Mask indexing for saving starting at 1 to reflect labels</a>
     </li>
+    <li class="toctree-l2"><a class="reference internal" href="#add-option-to-append-new-processed-dataset-index-to-existing-index">Add option to append new processed dataset index to existing index</a>
+    </li>
     </ul>
                 </li>
               </ul>
@@ -106,6 +108,11 @@ For datasets that have been processed by med-imagetools, we will take in the ind
 <h2 id="mask-indexing-for-saving-starting-at-1-to-reflect-labels">Mask indexing for saving starting at 1 to reflect labels</h2>
 <p><em>2026-01-07</em><br />
 Starting the mask labelling at 1 to reflect the voxel values they were in the original image. 0 is reserved for background.</p>
+<h2 id="add-option-to-append-new-processed-dataset-index-to-existing-index">Add option to append new processed dataset index to existing index</h2>
+<p><em>2026-01-08</em>
+Today's solution chosen for handling what to do if processing new data but you want to preserve the already processed data.
+<code>append_index</code> argument can be set such that an existing index file will be loaded in, the new processed data index will be concatenated to the end, checked for duplicates, sorted, and then saved. For duplicate checking, the new processed data entry will be kept. </p>
+<p>This way, if processing a dataset breaks in the middle, can update the metadata file with what data to process. Didn't want to implement image existence checking yet. </p>
               
             </div>
           </div><footer>
