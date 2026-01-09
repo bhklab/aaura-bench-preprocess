@@ -4,6 +4,7 @@ import pandas as pd
 import SimpleITK as sitk
 
 from imgtools.coretypes import MedImage, Mask, VectorMask
+from joblib import Parallel, delayed
 from pathlib import Path
 from skimage.measure import regionprops
 from tqdm import tqdm
@@ -150,7 +151,7 @@ def mask_proc(mask_path:Path,
 
 def process_one(sample:pd.Series,
 				dataset:str,
-				timepoint:str):
+				timepoint:str) -> dict:
 	id = sample['File Name']
 	logger.info(f'Processing sample: {id}')
 
@@ -189,7 +190,9 @@ def process(dataset:str,
 			metadata_file:Path = None,
 			anatomy_match_file:Path = None,
 			drop_data:list = None,
-			append_index:bool = False
+			append_index:bool = False,
+			parallel:bool = False,
+			n_jobs:int = -1
 			) -> pd.DataFrame:
 	"""Process the specified dataset for use in the AAuRA Benchmarking tool
 	
@@ -230,10 +233,29 @@ def process(dataset:str,
 
 		dataset_index = {}
 		try:
-			for _, sample in tqdm(metadata.iterrows(), desc=f"Processing {timepoint} images for AAuRA...", total=len(metadata)):
-				dataset_index.update(process_one(sample=sample,
-												 dataset=dataset,
-												 timepoint=timepoint)
+			# Parallel processing
+			if parallel:
+				dataset_index_list = Parallel(n_jobs=n_jobs)(
+					delayed(process_one)(
+						sample=sample,
+						dataset=dataset,
+						timepoint=timepoint
+						)
+						for _, sample in tqdm(
+							metadata.iterrows(), 
+							desc=f"Processing {timepoint} images for AAuRA...", 
+							total=len(metadata)
+						)
+				)
+
+				dataset_index.update(sample_metadata for sample in dataset_index_list for sample_metadata in sample.items())
+
+			else:
+			# Sequential processing
+				for _, sample in tqdm(metadata.iterrows(), desc=f"Processing {timepoint} images for AAuRA...", total=len(metadata)):
+					dataset_index.update(process_one(sample=sample,
+													dataset=dataset,
+													timepoint=timepoint)
 									)					
 		except Exception as e:
 			message = 'Error processing image data.'
@@ -284,4 +306,6 @@ if __name__ == '__main__':
 		    metadata_file=Path("images/naming.csv"),
 			anatomy_match_file=Path("metadata/dataset_anatomy_match.csv"),
 			drop_data=['coronacases','NIH-LYMPH'],
-			append_index=False)
+			append_index=False,
+			parallel=True,
+			n_jobs=-1)
