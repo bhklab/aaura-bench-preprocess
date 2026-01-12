@@ -62,6 +62,8 @@
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#add-option-to-append-new-processed-dataset-index-to-existing-index">Add option to append new processed dataset index to existing index</a>
     </li>
+    <li class="toctree-l2"><a class="reference internal" href="#mit_to_aaura_index-setup-for-datasets">mit_to_aaura_index setup for datasets</a>
+    </li>
     </ul>
                 </li>
               </ul>
@@ -113,6 +115,43 @@ Starting the mask labelling at 1 to reflect the voxel values they were in the or
 Today's solution chosen for handling what to do if processing new data but you want to preserve the already processed data.
 <code>append_index</code> argument can be set such that an existing index file will be loaded in, the new processed data index will be concatenated to the end, checked for duplicates, sorted, and then saved. For duplicate checking, the new processed data entry will be kept. </p>
 <p>This way, if processing a dataset breaks in the middle, can update the metadata file with what data to process. Didn't want to implement image existence checking yet. </p>
+<h2 id="mit_to_aaura_index-setup-for-datasets"><code>mit_to_aaura_index</code> setup for datasets</h2>
+<p><em>2026-01-12</em></p>
+<p>HCC-TACE-Seg  </p>
+<pre><code class="language-python">datasource = &quot;TCIA&quot;
+dataset = &quot;HCC-TACE-Seg&quot;
+ROI_key = &quot;Mass&quot;
+image_modality = &quot;CT&quot;
+mask_modality = [&quot;SEG&quot;]
+lesion_location = &quot;abdomen&quot;
+</code></pre>
+<p>4D-Lung</p>
+<pre><code class="language-python">datasource = &quot;TCIA&quot;
+dataset = &quot;4D-Lung&quot;
+ROI_key = &quot;Tumor_&quot;
+image_modality = &quot;CT&quot;
+mask_modality = [&quot;RTSTRUCT&quot;]
+lesion_location = &quot;abdomen&quot;
+</code></pre>
+<p>RIDER-LungCT-Seg  </p>
+<pre><code class="language-python">datasource = &quot;TCIA&quot;
+dataset = &quot;RIDER-LungCT-Seg&quot;
+ROI_key = &quot;GTVp|Neoplasm&quot;
+image_modality = &quot;CT&quot;
+mask_modality = [&quot;SEG&quot;,&quot;RTSTRUCT&quot;]
+lesion_location = &quot;abdomen&quot;
+</code></pre>
+<p>RADCURE<br />
+* Using mit_RADCURE_windowed</p>
+<pre><code class="language-python">datasource = &quot;TCIA&quot;
+dataset = &quot;RADCURE&quot;
+ROI_key = &quot;GTVp&quot;
+image_modality = &quot;CT&quot;
+mask_modality = [&quot;RTSTRUCT&quot;] # THIS HAS TO BE A LIST
+lesion_location = &quot;headneck&quot;
+special_prefix = &quot;OCSCC_&quot;
+special_suffix = &quot;_windowed&quot;
+</code></pre>
               
             </div>
           </div><footer>
