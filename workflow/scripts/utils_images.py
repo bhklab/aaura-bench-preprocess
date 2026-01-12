@@ -3,11 +3,11 @@ import pandas as pd
 import SimpleITK as sitk
 
 from imgtools.coretypes import MedImage, Mask, VectorMask
-from joblib import Parallel, delayed
 from pathlib import Path
 from skimage.measure import regionprops
-from tqdm import tqdm
 from damply import dirs
+import logging
+logger = logging.getLogger(__name__)
 
 def mask2D_to_oriented_bbox(mask:np.array) -> np.array:
 	"""Convert a 2D binary mask to an oriented bounding box around the region of interest"""
@@ -110,9 +110,11 @@ def mask_proc(mask_path:Path,
 	else:
 		proc_mask_metadata = {}
 		logger.info(f'Mask at {mask_path} has {len(unique_labels)-1} labelled volumes.')
+
 		for volume_idx in range(1, len(unique_labels)):
+			volume_label = unique_labels[volume_idx]
 			# Extract the volume with the current label (volume_idx)
-			idx_mask = (label_array == (volume_idx)).astype(np.uint8)
+			idx_mask = (label_array == (volume_label)).astype(np.uint8)
 
 			# Convert the extracted volume back to a sitk.Image
 			idx_mask_sitk = sitk.GetImageFromArray(idx_mask)
