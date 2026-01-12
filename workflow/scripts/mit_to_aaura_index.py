@@ -2,7 +2,6 @@ from damply import dirs
 from pathlib import Path
 import pandas as pd
 import logging
-import numpy as np
 from imgtools.coretypes import Mask
 
 from utils_images import get_rerecist_coords

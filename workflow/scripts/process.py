@@ -1,16 +1,12 @@
 import logging
-import numpy as np
 import pandas as pd
-import SimpleITK as sitk
 
-from imgtools.coretypes import MedImage, Mask, VectorMask
 from joblib import Parallel, delayed
 from pathlib import Path
-from skimage.measure import regionprops
 from tqdm import tqdm
 from damply import dirs
 
-from utils_images import mask2D_to_oriented_bbox, get_rerecist_coords, image_proc, mask_proc
+from utils_images import image_proc, mask_proc
 
 logging.basicConfig(
 	level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',
