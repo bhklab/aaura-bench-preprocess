@@ -39,7 +39,7 @@ dataset = "HCC-TACE-Seg"
 ROI_key = "Mass"
 image_modality = "CT"
 mask_modality = ["SEG"]
-lesion_location = "abdomen"
+disease_site = "Abdomen"
 ```  
 
 4D-Lung
@@ -49,7 +49,7 @@ dataset = "4D-Lung"
 ROI_key = "Tumor_"
 image_modality = "CT"
 mask_modality = ["RTSTRUCT"]
-lesion_location = "abdomen"
+disease_site = "Lung"
 ```
 
 RIDER-LungCT-Seg  
@@ -59,7 +59,7 @@ dataset = "RIDER-LungCT-Seg"
 ROI_key = "GTVp|Neoplasm"
 image_modality = "CT"
 mask_modality = ["SEG","RTSTRUCT"]
-lesion_location = "abdomen"
+disease_site = "Lung"
 ```
 
 RADCURE  
@@ -71,7 +71,31 @@ dataset = "RADCURE"
 ROI_key = "GTVp"
 image_modality = "CT"
 mask_modality = ["RTSTRUCT"] # THIS HAS TO BE A LIST
-lesion_location = "headneck"
+disease_site = "HeadNeck"
 special_prefix = "OCSCC_"
 special_suffix = "_windowed"
+```
+
+CPTAC-CCRCC
+```python
+datasource = "TCIA"
+dataset = "CPTAC-CCRCC"
+ROI_key = ".*"
+image_modality = "CT"
+mask_modality = ["RTSTRUCT"] # THIS HAS TO BE A LIST
+disease_site = "Abdomen"
+special_prefix = ""
+special_suffix = ""
+```
+
+CPTAC-PDA
+```python
+datasource = "TCIA"
+dataset = "CPTAC-PDA"
+ROI_key = ".*"
+image_modality = "CT"
+mask_modality = ["RTSTRUCT"] # THIS HAS TO BE A LIST
+disease_site = "Abdomen"
+special_prefix = ""
+special_suffix = ""
 ```
