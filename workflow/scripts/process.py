@@ -29,8 +29,15 @@ def process_one(sample:pd.Series,
 	# Process image
 	image_metadata = image_proc(dirs.RAWDATA / image_path, proc_path_stem)
 	logger.info(f'Image loaded, processed, and saved for sample: {id}')
-	masks_metadata = mask_proc(dirs.RAWDATA / mask_path, proc_path_stem)
-	logger.info(f'Mask loaded, processed, and saved for sample: {id}')
+
+	try:
+		masks_metadata = mask_proc(dirs.RAWDATA / mask_path, proc_path_stem)
+		logger.info(f'Mask loaded, processed, and saved for sample: {id}')
+	except ValueError as e:
+		# If a sample isn't labeled, skip it
+		message = f'Error processing mask for sample {id}: {e}. Will be skipped.'
+		logger.error(message)
+		return {}
 
 	sample_index = {}
 	for mask_key, mask_metadata in masks_metadata.items():
