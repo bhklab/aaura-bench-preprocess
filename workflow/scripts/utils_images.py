@@ -112,6 +112,7 @@ def mask_proc(mask_path:Path,
 		logger.info(f'Mask at {mask_path} has {len(unique_labels)-1} labelled volumes.')
 
 		for volume_idx in range(1, len(unique_labels)):
+			# Get the label value for the current volume (won't necessarily be equal to volume_idx)
 			volume_label = unique_labels[volume_idx]
 			# Extract the volume with the current label (volume_idx)
 			idx_mask = (label_array == (volume_label)).astype(np.uint8)
@@ -123,6 +124,7 @@ def mask_proc(mask_path:Path,
 			# Convert to MedImageTools Mask
 			idx_mask_mi = Mask(idx_mask_sitk, metadata={"mask.ndim": 3})
 			idx_mask_metadata = idx_mask_mi.fingerprint
+			idx_mask_metadata["voxel_label"] = int(volume_label)
 
 			# Write out the individual mask volume
 			if proc_path_stem is not None:
@@ -136,6 +138,7 @@ def mask_proc(mask_path:Path,
 			rerecist_coords, max_axial_index = get_rerecist_coords(idx_mask_mi)
 			idx_mask_metadata["annotation_coords"] = rerecist_coords
 			idx_mask_metadata["largest_slice_index"] = int(max_axial_index)
+			
 
 			proc_mask_metadata[f"{volume_idx}"] = idx_mask_metadata
 
