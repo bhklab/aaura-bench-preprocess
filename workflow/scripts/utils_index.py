@@ -2,7 +2,7 @@ from pathlib import Path
 import pandas as pd
 import logging
 import numpy as np
-
+logger = logging.getLogger(__name__)
 
 
 def make_edges_df(mit_index: pd.DataFrame | Path,
