@@ -20,9 +20,13 @@ dataset = "RADCURE"
 ROI_key = "GTVp"
 image_modality = "CT"
 mask_modality = ["RTSTRUCT"] # THIS HAS TO BE A LIST
-lesion_location = "headneck"
+disease_site = "HeadNeck"
 special_prefix = "OCSCC_"
 special_suffix = "_windowed"
+
+if disease_site:
+    # Set up data dirs with disease site if included
+	dirs.RAWDATA = dirs.RAWDATA / disease_site
 
 dataset_path_prefix = Path(f"{datasource}_{dataset}/images/mit_{dataset}{special_suffix}")
 mit_dir_path = dirs.RAWDATA / dataset_path_prefix
@@ -69,7 +73,7 @@ aaura_columns_dict = {"id":matched_index_rows['SampleID_image'],
 	}
 
 aaura_index = pd.DataFrame.from_dict(aaura_columns_dict)
-aaura_index['lesion_location'] = lesion_location
+aaura_index['lesion_location'] = disease_site.lower()
 aaura_index['source'] = f"{special_prefix}{dataset}"
 aaura_index.insert(3, 'mask_idx', 1)
 aaura_index.insert(4, 'mask_voxel_label', 1)
