@@ -49,6 +49,8 @@ def image_proc(image_path:Path,
 	----------
 	image_path : Path
 		Path to the image to process
+	proc_path_stem : str
+		Path to add to dirs.PROCDATA to save image out to.
 	
 	Returns
 	-------
@@ -88,6 +90,8 @@ def mask_proc(mask_path:Path,
 	----------
 	mask_path : Path
 		Path to the mask to process
+	proc_path_stem : str
+		Path to add to dirs.PROCDATA to save mask out to.
 
 	Returns
 	-------
