@@ -16,11 +16,11 @@ logger = logging.getLogger(__name__)
 
 
 datasource = "TCIA"
-dataset = "4D-Lung"
-ROI_key = "Tumor_"
+dataset = "HCC-TACE-Seg"
+ROI_key = "Mass"
 image_modality = "CT"
-mask_modality = "RTSTRUCT"
-lesion_location = "lung"
+mask_modality = "SEG"
+lesion_location = "abdomen"
 
 dataset_path_prefix = Path(f"{datasource}_{dataset}/images/mit_{dataset}")
 mit_dir_path = dirs.RAWDATA / dataset_path_prefix
@@ -64,7 +64,7 @@ annotation_coords = {}
 largest_slice_index = {}
 for sample_index, sample in aaura_index.iterrows():
     print(sample['id'])
-    mask = Mask.from_file(mit_dir_path/sample['mask_path'], metadata={"mask.ndim": 3})
+    mask = Mask.from_file(dirs.RAWDATA / sample['mask_path'], metadata={"mask.ndim": 3})
     # Get RERECIST coords for current volume
     rerecist_coords, max_axial_index = get_rerecist_coords(mask)
 
