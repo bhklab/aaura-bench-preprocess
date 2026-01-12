@@ -123,7 +123,7 @@ dataset = &quot;HCC-TACE-Seg&quot;
 ROI_key = &quot;Mass&quot;
 image_modality = &quot;CT&quot;
 mask_modality = [&quot;SEG&quot;]
-lesion_location = &quot;abdomen&quot;
+disease_site = &quot;Abdomen&quot;
 </code></pre>
 <p>4D-Lung</p>
 <pre><code class="language-python">datasource = &quot;TCIA&quot;
@@ -131,7 +131,7 @@ dataset = &quot;4D-Lung&quot;
 ROI_key = &quot;Tumor_&quot;
 image_modality = &quot;CT&quot;
 mask_modality = [&quot;RTSTRUCT&quot;]
-lesion_location = &quot;abdomen&quot;
+disease_site = &quot;Lung&quot;
 </code></pre>
 <p>RIDER-LungCT-Seg  </p>
 <pre><code class="language-python">datasource = &quot;TCIA&quot;
@@ -139,7 +139,7 @@ dataset = &quot;RIDER-LungCT-Seg&quot;
 ROI_key = &quot;GTVp|Neoplasm&quot;
 image_modality = &quot;CT&quot;
 mask_modality = [&quot;SEG&quot;,&quot;RTSTRUCT&quot;]
-lesion_location = &quot;abdomen&quot;
+disease_site = &quot;Lung&quot;
 </code></pre>
 <p>RADCURE<br />
 * Using mit_RADCURE_windowed</p>
@@ -148,9 +148,29 @@ dataset = &quot;RADCURE&quot;
 ROI_key = &quot;GTVp&quot;
 image_modality = &quot;CT&quot;
 mask_modality = [&quot;RTSTRUCT&quot;] # THIS HAS TO BE A LIST
-lesion_location = &quot;headneck&quot;
+disease_site = &quot;HeadNeck&quot;
 special_prefix = &quot;OCSCC_&quot;
 special_suffix = &quot;_windowed&quot;
+</code></pre>
+<p>CPTAC-CCRCC</p>
+<pre><code class="language-python">datasource = &quot;TCIA&quot;
+dataset = &quot;CPTAC-CCRCC&quot;
+ROI_key = &quot;.*&quot;
+image_modality = &quot;CT&quot;
+mask_modality = [&quot;RTSTRUCT&quot;] # THIS HAS TO BE A LIST
+disease_site = &quot;Abdomen&quot;
+special_prefix = &quot;&quot;
+special_suffix = &quot;&quot;
+</code></pre>
+<p>CPTAC-PDA</p>
+<pre><code class="language-python">datasource = &quot;TCIA&quot;
+dataset = &quot;CPTAC-PDA&quot;
+ROI_key = &quot;.*&quot;
+image_modality = &quot;CT&quot;
+mask_modality = [&quot;RTSTRUCT&quot;] # THIS HAS TO BE A LIST
+disease_site = &quot;Abdomen&quot;
+special_prefix = &quot;&quot;
+special_suffix = &quot;&quot;
 </code></pre>
               
             </div>
