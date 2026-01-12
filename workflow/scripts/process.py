@@ -66,7 +66,9 @@ def process(dataset:str,
 			anatomy_match_file:Path = None,
 			drop_data:list = None,
 			append_index:bool = False,
+			disease_site:str | None = None,
 			parallel:bool = False,
+
 			n_jobs:int = -1
 			) -> pd.DataFrame:
 	"""Process the specified dataset for use in the AAuRA Benchmarking tool
@@ -81,6 +83,16 @@ def process(dataset:str,
 		Name of the anatomy match file to use for the lesion location column of the output, by default None. Should exist in the rawdata/dataset folder
 	drop_data : list, optional
 		List of data sources to drop from the dataset, by default None.
+	append_index : bool, optional
+		Whether to append to the existing index (e.g. new data has been processed). If False, will overwrite existing index file.
+	disease_site : str, optional
+		Name of disease site file data is located in if organized that way in data/rawdata. 
+		Ex. data/procdata/MultiSite/CVPR_LesionLocator, would have this set to 'MultiSite'.
+		Will be appended to dirs.RAWDATA and dirs.PROCDATA for length of the run.
+	parallel : bool, optional
+		Whether to run processing in parallel, default is False.
+	n_jobs : int, optional
+		Number of jobs to run in parallel. Parallel must be set to True for this to be used. Default is -1.
 
 	Returns
 	-------
@@ -88,6 +100,10 @@ def process(dataset:str,
 		DataFrame containing the dataset index
 	"""
 	logger.info(f'Processing dataset: {dataset}')
+
+	# Set up data dirs with disease site if included
+	dirs.RAWDATA = dirs.RAWDATA / disease_site if disease_site else dirs.RAWDATA
+	dirs.PROCDATA = dirs.PROCDATA / disease_site if disease_site else dirs.PROCDATA
 
 	# Load metadata file
 	logger.info(f'Loading metadata file: {metadata_file}')
@@ -101,7 +117,7 @@ def process(dataset:str,
 		logger.info(f'Using anatomy match file: {anatomy_match_file}')
 		anatomy_match = pd.read_csv(dirs.RAWDATA / dataset / anatomy_match_file)
 
-	timepoints = ['Baseline', 'Synthetic_Follow_Up']
+	timepoints = ['Baseline']#, 'Synthetic_Follow_Up']
 
 	for timepoint in timepoints:
 		logger.info(f'Processing timepoint: {timepoint}')
@@ -178,9 +194,10 @@ def process(dataset:str,
 if __name__ == '__main__':
 	logger.info('Starting data processing for LesionLocator')
 	process(dataset="CVPR_LesionLocator",
-		    metadata_file=Path("images/naming.csv"),
+		    metadata_file=Path("images/naming_3.csv"),
 			anatomy_match_file=Path("metadata/dataset_anatomy_match.csv"),
 			drop_data=['coronacases','NIH-LYMPH'],
 			append_index=False,
+			disease_site='MultiSite',
 			parallel=True,
 			n_jobs=-1)
