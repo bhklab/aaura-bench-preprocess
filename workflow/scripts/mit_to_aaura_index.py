@@ -22,8 +22,8 @@ image_modality = "CT"
 mask_modality = "RTSTRUCT"
 lesion_location = "lung"
 
-
-mit_dir_path = dirs.RAWDATA / f"{datasource}_{dataset}" / "images" / f"mit_{dataset}"
+dataset_path_prefix = Path(f"{datasource}_{dataset}/images/mit_{dataset}")
+mit_dir_path = dirs.RAWDATA / dataset_path_prefix
 
 mit_index = pd.read_csv(mit_dir_path / f"mit_{dataset}_index-simple.csv")
 
@@ -45,8 +45,8 @@ matched_index_rows = make_edges_df(matched_index_rows,
 
 # Get the columns out of mit_index needed in the aaura index
 aaura_columns_dict = {"id":matched_index_rows['SampleID_image'],
-    "image_path": matched_index_rows['filepath_image'],
-    "mask_path": matched_index_rows['filepath_mask'],
+    "image_path": dataset_path_prefix / matched_index_rows['filepath_image'],
+    "mask_path": dataset_path_prefix / matched_index_rows['filepath_mask'],
     "size": matched_index_rows["size_image"],
     "spacing": matched_index_rows["spacing_image"],
     "origin": matched_index_rows["origin_image"],
@@ -57,7 +57,8 @@ aaura_columns_dict = {"id":matched_index_rows['SampleID_image'],
 aaura_index = pd.DataFrame.from_dict(aaura_columns_dict)
 aaura_index['lesion_location'] = lesion_location
 aaura_index['source'] = dataset
-aaura_index.insert(3, 'mask_idx', 1) 
+aaura_index.insert(3, 'mask_idx', 1)
+aaura_index.insert(4, 'mask_voxel_label', 1)
 
 annotation_coords = {}
 largest_slice_index = {}
@@ -70,8 +71,8 @@ for sample_index, sample in aaura_index.iterrows():
     annotation_coords[sample_index] = rerecist_coords
     largest_slice_index[sample_index] = int(max_axial_index)
 
-aaura_index.insert(4, 'annotation_type', 'RERECIST')
-aaura_index.insert(5, 'annotation_coords', annotation_coords)
-aaura_index.insert(6, 'largest_slice_index', largest_slice_index)
+aaura_index.insert(5, 'annotation_type', 'RERECIST')
+aaura_index.insert(6, 'annotation_coords', annotation_coords)
+aaura_index.insert(7, 'largest_slice_index', largest_slice_index)
 
 aaura_index.to_csv(mit_dir_path / f"aaura_{dataset}_index.csv", index=False)
