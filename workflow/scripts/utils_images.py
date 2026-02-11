@@ -1,15 +1,120 @@
-import numpy as np
-import pandas as pd
-import SimpleITK as sitk
-
-from imgtools.coretypes import MedImage, Mask, VectorMask
-from pathlib import Path
-from skimage.measure import regionprops
-from damply import dirs
 import logging
+from pathlib import Path
+
+import numpy as np
+import SimpleITK as sitk
+from damply import dirs
+from imgtools.coretypes import Mask, MedImage
+from skimage.measure import regionprops
+
 logger = logging.getLogger(__name__)
 
-def mask2D_to_oriented_bbox(mask:np.array) -> np.array:
+
+def get_max_area_slice(mask:MedImage) -> tuple[np.array, int]:
+	"""Get the slice and index of the axial slice with the largest ROI area in a mask
+	
+	Parameters
+	----------
+	mask: MedImage
+		The mask to analyze, expected to be a binary mask with shape (z, x, y)
+	
+	Returns
+	-------
+	max_area_slice: np.array
+		The 2D slice with the largest ROI area
+	max_axial_index: int
+		The index of the axial slice with the largest ROI area
+	"""
+	# Convert the sitk.Image to a numpy array
+	np_mask = mask.to_numpy()[0]
+	# Sum the mask in the x and y axes to find the axial slice with the largest tumour area
+	axial_sum = np.sum(np_mask, axis=(1,2))
+	# Get the index of the axial slice with the largest tumour area
+	max_axial_index = np.argmax(axial_sum)
+	# Select out the slice with the largest index
+	max_area_slice = np_mask[max_axial_index]
+
+	return max_area_slice, max_axial_index
+
+
+
+def get_centered_bbox(center_pt: np.array, 
+                      major_axis_length: float, 
+                      max_axial_index: int) -> np.ndarray: 
+    '''  
+    Get a square bounding box centered on the midpoint of the RERECIST line. 
+
+    Parameters
+    ----------
+    center_pt: np.array
+        Contains the midpoint of the RERECIST line in [x_cent, y_cent] form.
+    major_axis_length: float
+        Length of the RERECIST line.
+    max_axial_index: int
+        The index of the slice with the largest area.
+
+    Returns
+    -----------
+    centered_bbox_3d: np.ndarray
+        A bounding box with shape compatible with nnInteractive prompt input. 
+        NOTE: In readme.md, bounding boxes are defined as [[x1, x2], [y1, y2], [z1, z2]], 
+        but in my experience they are actually [[y1, y2], [x1, x2], [z1, z2]]. The latter
+        is what is implemented here.
+    '''
+    #Get top left and bottom right corners of the bounding box 
+    x_tl = center_pt[0] - major_axis_length / 2 
+    y_tl = center_pt[1] - major_axis_length / 2 
+
+    x_br = center_pt[0] + major_axis_length / 2 
+    y_br = center_pt[1] + major_axis_length / 2
+
+    # Note that the nnInteractive examples say the bounding box is in (x, y, z) order, but
+    # in my experience, it actually expects (y, x, z) order 
+    centered_bbox_3d = np.array([min(512, int(y_tl)), min(512, int(y_br)), min(512, int(x_tl)), min(512, int(x_br)), int(max_axial_index), int(max_axial_index + 1)])
+
+    return centered_bbox_3d
+
+
+def mask3D_to_centered_bbox(mask:MedImage,  # noqa
+							max_axial_index:int = None
+							) -> np.array:
+	"""Convert a 3D binary mask to a centered bounding box around the region of interest
+	
+	Parameters
+	----------
+	mask: MedImage
+		The mask to analyze, expected to be a binary mask with shape (z, x, y)
+	max_axial_index: int, optional
+		The index of the axial slice to use for calculating the bounding box. If None, the slice with the largest tumour area will be used. Default is None.
+	
+	Returns
+	-------
+	centered_bbox_2d: np.array
+		A bounding box with shape compatible with nnInteractive prompt input, centered on the RERECIST line. 
+		NOTE: In readme.md, bounding boxes are defined as [[x1, x2], [y1, y2], [z1, z2]], but in my experience they are actually [[y1, y2], [x1, x2], [z1, z2]]. The latter is what is implemented here.
+
+	"""
+
+	if max_axial_index is None:
+		# Get the index of the axial slice with the largest tumour area
+		max_area_slice, max_axial_index = get_max_area_slice(mask)
+	else:
+		max_area_slice = mask.to_numpy()[0][max_axial_index]
+
+	# Get the centroid and major axis length of the region in the slice with the largest tumour area - this is the centroid and major axis length of the RERECIST line
+	props = regionprops(max_area_slice)[0]
+	y_cent, x_cent = props.centroid
+	maj_axis_len = props.axis_major_length
+
+	# Pass the center point of the RECIST line in the expected format 
+	center_pt = np.array([x_cent, y_cent])
+	centered_bbox_3d = get_centered_bbox(center_pt, maj_axis_len, max_axial_index)
+
+	return centered_bbox_3d	
+
+
+
+def mask2D_to_oriented_bbox(mask:np.array) -> np.array:  # noqa
 	"""Convert a 2D binary mask to an oriented bounding box around the region of interest"""
 	props = regionprops(mask)[0]
 	y_cent, x_cent = props.centroid
@@ -28,14 +133,9 @@ def mask2D_to_oriented_bbox(mask:np.array) -> np.array:
 
 def get_rerecist_coords(mask:MedImage) -> np.array:
 	"""Get the RERECIST coordinates for a mask as the corners of an oriented bounding box"""
-	# Convert the sitk.Image to a numpy array
-	np_mask = mask.to_numpy()[0]
-	# Sum the mask in the x and y axes to find the axial slice with the largest tumour area
-	axial_sum = np.sum(np_mask, axis=(1,2))
 	# Get the index of the axial slice with the largest tumour area
-	max_axial_index = np.argmax(axial_sum)
+	max_slice, max_axial_index = get_max_area_slice(mask)
 
-	max_slice = np_mask[max_axial_index]
 	rerecist_coords = mask2D_to_oriented_bbox(max_slice)
 
 	return rerecist_coords, max_axial_index
@@ -108,8 +208,9 @@ def mask_proc(mask_path:Path,
 	unique_labels = np.unique(label_array)
 
 	if len(unique_labels) == 1:
-		logger.info(f'Mask at {mask_path} has no labelled volumes.')
-		raise ValueError('Mask has no labelled volumes.')
+		message = f'Mask at {mask_path} has no labelled volumes.'
+		logger.info(message)
+		raise ValueError(message)
 	
 	else:
 		proc_mask_metadata = {}
@@ -143,6 +244,10 @@ def mask_proc(mask_path:Path,
 			idx_mask_metadata["annotation_coords"] = rerecist_coords
 			idx_mask_metadata["largest_slice_index"] = int(max_axial_index)
 			
+			# Get a bounding box centered on the RERECIST line for current volume
+			centered_bbox = mask3D_to_centered_bbox(idx_mask_mi, max_axial_index=max_axial_index)
+			idx_mask_metadata["centered_bbox_coords"] = centered_bbox
+
 
 			proc_mask_metadata[f"{volume_idx}"] = idx_mask_metadata
 
