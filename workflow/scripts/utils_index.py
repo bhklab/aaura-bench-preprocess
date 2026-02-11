@@ -56,7 +56,7 @@ def make_edges_df(mit_index: pd.DataFrame | Path,
     return edges_df
 
 
-def insert_SampleID(dataset_index:pd.DataFrame) -> pd.DataFrame:
+def insert_SampleID(dataset_index:pd.DataFrame) -> pd.DataFrame:  # noqa
     """Combine the PatientID and SampleNumber columns in an index to generate a SampleID
        SampleNumber is padded with 0s to make a length of four.
     """
