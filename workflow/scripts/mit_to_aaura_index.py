@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 from damply import dirs
 from imgtools.coretypes import Mask
-from utils_images import get_rerecist_coords
+from utils_images import get_rerecist_coords, mask3D_to_centered_bbox
 from utils_index import insert_SampleID, make_edges_df
 
 logging.basicConfig(
@@ -82,7 +82,7 @@ annotation_coords = {}
 largest_slice_index = {}
 centered_bbox_coords = {}
 for sample_index, sample in aaura_index.iterrows():
-    print(sample['id'])
+    logger.info(f"Processing sample: {sample['id']}")
     # Load in Mask as MedImageTools Mask object
     mask = Mask.from_file(dirs.RAWDATA / sample['mask_path'], metadata={"mask.ndim": 3})
     # Get RERECIST coords for current volume
