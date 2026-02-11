@@ -1,11 +1,10 @@
 import logging
-import pandas as pd
-
-from joblib import Parallel, delayed
 from pathlib import Path
-from tqdm import tqdm
-from damply import dirs
 
+import pandas as pd
+from damply import dirs
+from joblib import Parallel, delayed
+from tqdm import tqdm
 from utils_images import image_proc, mask_proc
 
 logging.basicConfig(

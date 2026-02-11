@@ -1,9 +1,10 @@
-import SimpleITK as sitk
+import logging
 from pathlib import Path
-from damply import dirs
+
 import numpy as np
+import SimpleITK as sitk
+from damply import dirs
 from tqdm import tqdm
-import logging 
 
 logging.basicConfig(
 	level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',

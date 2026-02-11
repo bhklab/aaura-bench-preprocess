@@ -1,12 +1,12 @@
-import numpy as np
-import pandas as pd
-import SimpleITK as sitk
-
-from imgtools.coretypes import MedImage, Mask, VectorMask
-from pathlib import Path
-from skimage.measure import regionprops
-from damply import dirs
 import logging
+from pathlib import Path
+
+import numpy as np
+import SimpleITK as sitk
+from damply import dirs
+from imgtools.coretypes import Mask, MedImage
+from skimage.measure import regionprops
+
 logger = logging.getLogger(__name__)
 
 
