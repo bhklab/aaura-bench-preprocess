@@ -18,29 +18,29 @@ logger = logging.getLogger(__name__)
 def process_one(sample:pd.Series,
 				dataset:str,
 				timepoint:str) -> dict:
-	id = sample['File Name']
-	logger.info(f'Processing sample: {id}')
+	sample_id = sample['File Name']
+	logger.info(f'Processing sample: {sample_id}')
 
-	image_path = Path(dataset) / 'images' / timepoint / 'images' / f'{id}_0000.nii.gz'
-	mask_path = Path(dataset) / 'images' / timepoint / 'labels' / f'{id}.nii.gz'
+	image_path = Path(dataset) / 'images' / timepoint / 'images' / f'{sample_id}_0000.nii.gz'
+	mask_path = Path(dataset) / 'images' / timepoint / 'labels' / f'{sample_id}.nii.gz'
 
-	proc_path_stem = Path(dataset, "images", timepoint, id)
+	proc_path_stem = Path(dataset, "images", timepoint, sample_id)
 	# Process image
 	image_metadata = image_proc(dirs.RAWDATA / image_path, proc_path_stem)
-	logger.info(f'Image loaded, processed, and saved for sample: {id}')
+	logger.info(f'Image loaded, processed, and saved for sample: {sample_id}')
 
 	try:
 		masks_metadata = mask_proc(dirs.RAWDATA / mask_path, proc_path_stem)
-		logger.info(f'Mask loaded, processed, and saved for sample: {id}')
+		logger.info(f'Mask loaded, processed, and saved for sample: {sample_id}')
 	except ValueError as e:
 		# If a sample isn't labeled, skip it
-		message = f'Error processing mask for sample {id}: {e}. Will be skipped.'
-		logger.error(message)
+		message = f'Error processing mask for sample {sample_id}: {e}. Will be skipped.'
+		logger.exception(message)
 		return {}
 
 	sample_index = {}
 	for mask_key, mask_metadata in masks_metadata.items():
-		sample_index[f"{id}_{mask_key}"] = {"id": id,
+		sample_index[f"{sample_id}_{mask_key}"] = {"id": sample_id,
 									  		"image_path": proc_path_stem / 'CT.nii.gz',
 									  		"mask_path": proc_path_stem / f'mask_{mask_key}.nii.gz',
 											"mask_idx": int(mask_key),
@@ -68,7 +68,6 @@ def process(dataset:str,
 			append_index:bool = False,
 			disease_site:str | None = None,
 			parallel:bool = False,
-
 			n_jobs:int = -1
 			) -> pd.DataFrame:
 	"""Process the specified dataset for use in the AAuRA Benchmarking tool
@@ -148,10 +147,10 @@ def process(dataset:str,
 													dataset=dataset,
 													timepoint=timepoint)
 									)					
-		except Exception as e:
+		except Exception:
 			message = 'Error processing image data.'
-			logger.error(message)
-			raise e
+			logger.exception(message)
+			raise
 		
 		# Convert dataset index to DataFrame
 		dataset_index_df = pd.DataFrame.from_dict(dataset_index, orient='index')
