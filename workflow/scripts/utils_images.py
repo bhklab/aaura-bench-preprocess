@@ -75,8 +75,9 @@ def get_centered_bbox(center_pt: np.array,
     return centered_bbox_3d
 
 
-def mask3D_to_centered_bbox(mask:MedImage,
-							max_axial_index:int = None) -> np.array:
+def mask3D_to_centered_bbox(mask:MedImage,  # noqa
+							max_axial_index:int = None
+							) -> np.array:
 	"""Convert a 3D binary mask to a centered bounding box around the region of interest
 	
 	Parameters
@@ -113,7 +114,7 @@ def mask3D_to_centered_bbox(mask:MedImage,
 
 
 
-def mask2D_to_oriented_bbox(mask:np.array) -> np.array:
+def mask2D_to_oriented_bbox(mask:np.array) -> np.array:  # noqa
 	"""Convert a 2D binary mask to an oriented bounding box around the region of interest"""
 	props = regionprops(mask)[0]
 	y_cent, x_cent = props.centroid
@@ -207,8 +208,9 @@ def mask_proc(mask_path:Path,
 	unique_labels = np.unique(label_array)
 
 	if len(unique_labels) == 1:
-		logger.info(f'Mask at {mask_path} has no labelled volumes.')
-		raise ValueError('Mask has no labelled volumes.')
+		message = f'Mask at {mask_path} has no labelled volumes.'
+		logger.info(message)
+		raise ValueError(message)
 	
 	else:
 		proc_mask_metadata = {}
