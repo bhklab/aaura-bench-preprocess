@@ -43,6 +43,10 @@ pydanclick = ">=0.5.1, <0.6"
 
 [tasks]
 example_script = {cmd="python $SCRIPTS/example_script.py", description="Run an example script"}
+mit-to-aaura.cmd = ["python", "workflow/scripts/mit_to_aaura_index.py"]
+mit-to-aaura.description = "Convert mit_dataset_index-simple.csv to an aaura_dataset_index.csv"
+
+nifti-to-aaura.cmd = ["python", "workflow/scripts/process.py"]
 
 ############################################## QUALITY ###############################################
 # Quality includes linting, type checking, and formatting
