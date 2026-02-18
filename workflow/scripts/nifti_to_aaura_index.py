@@ -36,6 +36,7 @@ class NiftiDatasetConfig(BaseModel):
     image_modality: Optional[str] = Field(default="CT", description="The modality of the images (e.g. CT)")
     drop_data: Optional[dict[str, list[str]]] = Field(default=None, description="Dictionary specifying any data to drop from the index (e.g. {'patient_id': ['TCGA-02-0047']})")
     anatomy_match_file: Optional[str] = Field(default=None, description="Path to a separate metadata file containing mappings of sources to anatomy labels, for use when dataset contains multiple other datasets with different disease sites.")
+    sample_id_pattern: Optional[str] = Field(default=None, description="Pattern to use to build a sample_id column to use instead of patient_id_col. (e.g. '{dataset}_{patient_id}')")
 
     @field_validator('scan_name_pattern')
     def validate_filename_pattern(cls, v):
@@ -85,26 +86,79 @@ def image_path_resolver(metadata_row:pd.Series,
     return image_path_resolver.resolve(metadata_row.to_dict())
 
 
+def sample_id_resolver(metadata_row:pd.Series,
+                       sample_id_pattern:str):
+    sample_id_resolver = PatternResolver(sample_id_pattern)
+
+    return sample_id_resolver.resolve(metadata_row.to_dict())
+
+
+def metadata_setup(metadata_df:pd.DataFrame,
+                   config):
+    
+    dataset_name = f"{config.datasource}_{config.dataset}"
+    drop_data = config.drop_data
+    patient_id_col = config.patient_id_col
+    sample_id_pattern = config.sample_id_pattern
+    scan_path_pattern = config.scan_path_pattern
+    scan_name_pattern = config.scan_name_pattern
+    mask_path_pattern = config.mask_path_pattern
+    mask_name_pattern = config.mask_name_pattern
+
+    # Handle any data needing to be removed before processing
+    if drop_data is not None:
+        logger.info(f'Dropping data from: {drop_data}')
+        for column_name, values in drop_data.items():
+            metadata_df = metadata_df[metadata_df[column_name].str.contains('|'.join(values))]
+
+    metadata_df['raw_scan_path'] = metadata_df.apply(
+        lambda row: Path(f"{dataset_name}") / "images" / image_path_resolver(row, scan_path_pattern, scan_name_pattern), 
+        axis = 1
+        )
+
+    metadata_df['raw_mask_path'] = metadata_df.apply(
+        lambda row: Path(f"{dataset_name}") / "images" / image_path_resolver(row, mask_path_pattern, mask_name_pattern), 
+        axis = 1
+        )
+    
+    # Handle setting up the sample_id column by matching a pattern or copying the patient_id_col
+    if sample_id_pattern is not None:
+        sample_id_col = metadata_df.apply(lambda row: sample_id_resolver(row, sample_id_pattern))
+    else:
+        sample_id_col = metadata_df[patient_id_col]
+    
+    metadata_df.insert(loc=0,
+                       column='sample_id',
+                       value=sample_id_col
+                      )
+    
+    # Rename the patient_id_col to source_patient_id
+    metadata_df = metadata_df.rename(columns = {patient_id_col: "source_patient_id"})
+
+    return metadata_df
+
+
 
 def process_one(sample:pd.Series,
                 proc_path_stem: Path,
                 config:NiftiDatasetConfig
                 ) -> dict[dict]:
-    sample_id = sample[config.patient_id_col]
+    sample_id = sample['sample_id']
+
     logger.info(f'Processing sample: {sample_id}')
 
     # Add the filename to the end of the proc_path_stem
-    proc_path_stem = proc_path_stem / sample_id
+    proc_sample_path_stem = proc_path_stem / sample_id
 
     # Process scan
-    scan_metadata = mask_proc(image_path = dirs.RAWDATA / sample['raw_scan_path'],
-                                proc_path_stem=proc_path_stem,
-                                modality = config.image_modality)
+    scan_metadata = scan_proc(scan_path = dirs.RAWDATA / sample['raw_scan_path'],
+                              proc_path_stem=proc_sample_path_stem,
+                              modality = config.image_modality)
     logger.info(f'Image loaded, processed, and saved for sample: {sample_id}')
 
     try:
         masks_metadata = mask_proc(mask_path = dirs.RAWDATA / sample['raw_mask_path'],
-                                   proc_path_stem=proc_path_stem)
+                                   proc_path_stem=proc_sample_path_stem)
         logger.info(f'Mask loaded, processed, and saved for sample: {sample_id}')
     except ValueError as e:
         # If a sample isn't labeled, skip it
@@ -115,7 +169,7 @@ def process_one(sample:pd.Series,
     sample_index = {}
     for mask_key, mask_metadata in masks_metadata.items():
         sample_index[f"{sample_id}_{mask_key}"] = {"id": sample_id,
-                                                   "image_path": scan_metadata["image_path"],
+                                                   "scan_path": scan_metadata["scan_path"],
                                                    "mask_path": mask_metadata["mask_path"],
                                                    "mask_idx": int(mask_key),
                                                    "mask_voxel_label": int(mask_metadata["voxel_label"]),
@@ -128,9 +182,10 @@ def process_one(sample:pd.Series,
                                                    "origin": scan_metadata["origin"],
                                                    "direction": scan_metadata["direction"],
                                                    "mask_volume": mask_metadata["sum"],
+                                                   "disease_site": config.disease_site,
+                                                   "source_patient_id": sample["source_patient_id"]
                                             }
     return sample_index
-
 
 
 
@@ -151,55 +206,23 @@ def nifti_to_aaura_index(config: NiftiDatasetConfig,
     pd.DataFrame
         The AAuRA compatible index
     """
-
     dataset_name = f"{config.datasource}_{config.dataset}"
-    # dataset = config.dataset
-    disease_site = config.disease_site
     metadata_files = config.metadata_files
-    scan_path_pattern = config.scan_path_pattern
-    mask_path_pattern = config.mask_path_pattern
-    patient_id_col = config.patient_id_col
-    scan_name_pattern = config.scan_name_pattern
-    mask_name_pattern = config.mask_name_pattern
-    drop_data = config.drop_data
 
     logger.info(f'Processing dataset: {dataset_name}')
 
-    # Set up data dirs with disease site if included
-    if disease_site:
-        rawdata_dir = dirs.RAWDATA / disease_site / f"{dataset_name}"
-        procdata_dir = dirs.PROCDATA / disease_site / f"{dataset_name}"
-    else:
-        # Add dataset name to raw and procdata paths
-        rawdata_dir = dirs.RAWDATA / f"{dataset_name}"
-        procdata_dir = dirs.PROCDATA / f"{dataset_name}"
-
     # Load metadata
     # Just handling CSV for now, will need to add other modalities
-    metadata_df = pd.read_csv(rawdata_dir / "metadata" / metadata_files[0])
+    metadata_df = pd.read_csv(dirs.RAWDATA / dataset_name /  "metadata" / metadata_files[0])
+    metadata_df = metadata_setup(metadata_df, config)
 
-    if drop_data is not None:
-        logger.info(f'Dropping data from: {drop_data}')
-        for column_name, values in drop_data.items():
-            metadata_df = metadata_df[metadata_df[column_name].str.contains('|'.join(values))]
-
-    metadata_df['raw_scan_path'] = metadata_df.apply(
-        lambda row: Path(f"{dataset_name}") / "images" / image_path_resolver(row, scan_path_pattern, scan_name_pattern), 
-        axis = 1
-        )
-
-    metadata_df['raw_mask_path'] = metadata_df.apply(
-        lambda row: Path(f"{dataset_name}") / "images" / image_path_resolver(row, mask_path_pattern, mask_name_pattern), 
-        axis = 1
-        )
-    
     # Set up output for processed images and index
-    proc_path_stem = Path(f"{config.datasource}_{config.dataset}", "images", f"aaura_{config.dataset}")
+    proc_path_stem = Path(dataset_name, "images", f"aaura_{config.dataset}")
     aaura_index = {}
     try:
         if parallel:
         # Parallel processing
-            aaura_index_list = Parallel(n_jobs=n_jobs)(
+            aaura_index_list = Parallel(n_jobs=n_jobs, prefer="threads")(
                 delayed(process_one)(
                     sample=sample,
                     proc_path_stem=proc_path_stem,
@@ -213,6 +236,7 @@ def nifti_to_aaura_index(config: NiftiDatasetConfig,
             )
 
             aaura_index.update(sample_metadata for sample in aaura_index_list for sample_metadata in sample.items())
+
         else:
         # Sequential processing
             for _, sample in tqdm(
@@ -231,20 +255,12 @@ def nifti_to_aaura_index(config: NiftiDatasetConfig,
 
     aaura_index_df = pd.DataFrame.from_dict(aaura_index, orient='index')
 
-    # Change the existing patient_id column to be called source_id
-    aaura_index_df = aaura_index_df.rename(columns={patient_id_col: 'source_id'})
-    # Create a new aaura id column using the dataset name and in the index number
-    aaura_index_df.insert(loc=0, 
-                          column='sample_id', 
-                          value = aaura_index_df.apply(lambda row: f'{dataset_name}_{row.name:04d}')
-    )
-
-    index_save_path = proc_path_stem / f'aaura_{config.dataset}_index.csv'
+    # Set up output for index file
+    index_save_path = dirs.PROCDATA / proc_path_stem / f'aaura_{config.dataset}_index.csv'
     if not index_save_path.parent.exists():
         index_save_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Check if index file already exists
-
     if index_save_path.exists():
         logger.info(f'Index file already exists at: {index_save_path}')
         if append_index:
@@ -270,7 +286,9 @@ def nifti_to_aaura_index(config: NiftiDatasetConfig,
 # @click.command()
 # @from_pydantic(NiftiDatasetConfig)
 def run_nifti_to_aaura_index(dataset_config:NiftiDatasetConfig):
-    aaura_index = nifti_to_aaura_index(dataset_config)
+    aaura_index = nifti_to_aaura_index(dataset_config,
+                                       parallel=True,
+                                       n_jobs = -1)
 
 
 if __name__ == "__main__":
@@ -284,7 +302,7 @@ if __name__ == "__main__":
         mask_path_pattern="masks",
         metadata_files = ['clinical_and_imaging_info.csv'],
         image_modality="MR",
-        # disease_site='breast'
+        disease_site='breast'
     )
 
     run_nifti_to_aaura_index(mama_mia_config)
