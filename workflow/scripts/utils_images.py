@@ -5,6 +5,7 @@ import numpy as np
 import SimpleITK as sitk
 from damply import dirs
 from imgtools.coretypes import Mask, MedImage
+from imgtools.transforms.functional import bias_correction
 from skimage.measure import regionprops
 
 logger = logging.getLogger(__name__)
@@ -141,6 +142,16 @@ def get_rerecist_coords(mask:MedImage) -> np.array:
 	return rerecist_coords, max_axial_index
 
 
+
+def mr_proc(scan:sitk.Image) -> sitk.Image:
+	"""Apply bias correction to MR image"""
+	# sitk N4 bias correction requires the image to be a float
+	scan_float = sitk.Cast(scan, sitk.sitkFloat32)
+
+	return bias_correction(scan_float)
+
+
+
 def scan_proc(scan_path:Path,
 			   proc_path_stem:str|None = None,
 			   modality:str = 'CT') -> dict:
@@ -156,12 +167,19 @@ def scan_proc(scan_path:Path,
 	Returns
 	-------
 	MedImage
-		Processed MedImage object, cast to Int32
+		Processed MedImage object, CT's cast to Int32, MR's to Float32
 	"""
 	# Read in scan
 	scan_sitk = sitk.ReadImage(str(scan_path))
-	# Cast scan to Int16
-	scan_sitk = sitk.Cast(scan_sitk, sitk.sitkInt32)
+
+	if modality == 'CT':
+		# Cast scan to Int16
+		scan_sitk = sitk.Cast(scan_sitk, sitk.sitkInt32)
+	
+	elif modality == 'MR':
+		# Apply bias correction and cast to Float32
+		scan_sitk = mr_proc(scan_sitk)
+
 	# Convert to MedImage
 	scan = MedImage(scan_sitk)
 
