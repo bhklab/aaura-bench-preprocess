@@ -52,6 +52,13 @@ class NiftiDatasetConfig(BaseModel):
             v = info.data['scan_name_pattern']
         return v
 
+    @field_validator('image_modality')
+    def validate_image_modality(cls, v):
+        if v.upper() not in ['CT', 'MR']:
+            raise ValueError("modality must be one of CT or MR")
+        else:
+            return v
+
     @field_validator('metadata_files')
     @classmethod
     def validate_metadata_files(cls, v: list[str], info: ValidationInfo):
@@ -66,6 +73,8 @@ class NiftiDatasetConfig(BaseModel):
             if info.data['anatomy_match_file'] is not None:
                 v.drop(info.data['anatomy_match_file'], inplace=True)
         return v
+    
+    
     
 
 #TODO: implement this function
