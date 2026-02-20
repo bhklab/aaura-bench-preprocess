@@ -1,5 +1,8 @@
 # Developer Notes
 
+## Adding N4 bias correction for MR images
+When running nifti_to_aaura_index, adding functionality for MR images to be run through N4 Bias Correction during processing, as they would be by med-imagetools. This does add substantial processing time (~25 minutes per image in MAMA-MIA dataset at least).
+
 ## Removing COVID-19 CT Lung from analysis
 *2026-01-07*  
 We chose to remove these samples from analysis as they do not have tumours present and only include a small number of samples. 
