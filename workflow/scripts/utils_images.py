@@ -146,6 +146,8 @@ def get_rerecist_coords(mask:MedImage) -> np.array:
 def mr_proc(scan:sitk.Image) -> sitk.Image:
 	"""Apply bias correction to MR image"""
 	# sitk N4 bias correction requires the image to be a float
+
+	logging.info("Starting bias correction...")
 	scan_float = sitk.Cast(scan, sitk.sitkFloat32)
 
 	return bias_correction(scan_float)
@@ -179,6 +181,7 @@ def scan_proc(scan_path:Path,
 	elif modality == 'MR':
 		# Apply bias correction and cast to Float32
 		scan_sitk = mr_proc(scan_sitk)
+		logging.info("Finished bias correction")
 
 	# Convert to MedImage
 	scan = MedImage(scan_sitk)
