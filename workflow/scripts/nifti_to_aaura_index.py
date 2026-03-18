@@ -7,12 +7,14 @@ from pathlib import Path
 import click
 import pandas as pd
 from damply import dirs
+from functools import reduce
 from imgtools.pattern_parser import PatternResolver
 from joblib import Parallel, delayed
 from pydanclick import from_pydantic
 from tqdm import tqdm
 from utils_images import scan_proc, mask_proc
 from utils_models import AAuraIndexRow
+from utils_loaders import load_file_to_dataframe
 
 logging.basicConfig(
 	level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',
@@ -76,12 +78,21 @@ class NiftiDatasetConfig(BaseModel):
     
     
     
-
-#TODO: implement this function
 def combine_all_metadata(metadata_files: list[Path],
-                         key_name:str = 'patient_id') -> pd.DataFrame:
+                         key_name:str = 'patient_id',
+                         metadata_dir_path:Path = Path("metadata")
+                         ) -> pd.DataFrame:
+    """Load in a list of files as dataframes, then merge them all on the key_name to generate one giant metadata df"""
     
-    pass
+    loaded_metadata = {}
+
+    for file in metadata_files:
+        loaded_metadata[str(file)] = load_file_to_dataframe(metadata_dir_path / file)       
+
+    # Perform merge between the loaded metadata dataframes based on the key_name provided, resulting in one large metadata df
+    combined_metadata = reduce(lambda left, right: pd.merge(left, right, on=key_name, how='inner'), loaded_metadata.values())
+
+    return combined_metadata
 
 
 def image_path_resolver(metadata_row:pd.Series,
@@ -97,12 +108,12 @@ def image_path_resolver(metadata_row:pd.Series,
 
 def sample_id_resolver(metadata_row:pd.Series,
                        sample_id_pattern:str):
-    sample_id_resolver = PatternResolver(sample_id_pattern)
+    sample_id_resolver = PatternResolver(f"{sample_id_pattern}")
 
     return sample_id_resolver.resolve(metadata_row.to_dict())
 
 
-def metadata_setup(metadata_df:pd.DataFrame,
+def metadata_setup(metadata_files:list[Path],
                    config):
     
     dataset_name = f"{config.datasource}_{config.dataset}"
@@ -113,6 +124,17 @@ def metadata_setup(metadata_df:pd.DataFrame,
     scan_name_pattern = config.scan_name_pattern
     mask_path_pattern = config.mask_path_pattern
     mask_name_pattern = config.mask_name_pattern
+
+    if len(metadata_files) > 1:
+        metadata_df = combine_all_metadata(metadata_files = metadata_files,
+                                           key_name = patient_id_col,
+                                           metadata_dir_path = dirs.RAWDATA / dataset_name / "metadata")
+    else:
+        metadata_df = load_file_to_dataframe(metadata_files[0])
+
+
+    # Add the dataset name as a column to the metadata for naming purposes
+    metadata_df['dataset'] = str(config.dataset)
 
     # Handle any data needing to be removed before processing
     if drop_data is not None:
@@ -132,7 +154,7 @@ def metadata_setup(metadata_df:pd.DataFrame,
     
     # Handle setting up the sample_id column by matching a pattern or copying the patient_id_col
     if sample_id_pattern is not None:
-        sample_id_col = metadata_df.apply(lambda row: sample_id_resolver(row, sample_id_pattern))
+        sample_id_col = metadata_df.apply(lambda row: sample_id_resolver(row, sample_id_pattern), axis=1)
     else:
         sample_id_col = metadata_df[patient_id_col]
     
@@ -219,11 +241,11 @@ def nifti_to_aaura_index(config: NiftiDatasetConfig,
     metadata_files = config.metadata_files
 
     logger.info(f'Processing dataset: {dataset_name}')
-
+    
     # Load metadata
-    # Just handling CSV for now, will need to add other modalities
-    metadata_df = pd.read_csv(dirs.RAWDATA / dataset_name /  "metadata" / metadata_files[0])
-    metadata_df = metadata_setup(metadata_df, config)
+    metadata_df = metadata_setup(metadata_files, config)
+
+    metadata_df = metadata_df.loc[0:2]
 
     # Set up output for processed images and index
     proc_path_stem = Path(dataset_name, "images", f"aaura_{config.dataset}")
@@ -301,18 +323,28 @@ def run_nifti_to_aaura_index(dataset_config:NiftiDatasetConfig):
 
 
 if __name__ == "__main__":
-    mama_mia_config = NiftiDatasetConfig(
-        datasource='BCN-AIM',
-        dataset='MAMA-MIA',
-        patient_id_col = 'patient_id',
-        scan_name_pattern="{patient_id}_0000.nii.gz",
-        mask_name_pattern="{patient_id}.nii.gz",
-        scan_path_pattern="scans/{patient_id}",
-        mask_path_pattern="masks",
-        metadata_files = ['clinical_and_imaging_info.csv'],
-        image_modality="MR",
-        disease_site='breast'
-    )
+    # mama_mia_config = NiftiDatasetConfig(
+    #     datasource='BCN-AIM',
+    #     dataset='MAMA-MIA',
+    #     patient_id_col = 'patient_id',
+    #     scan_name_pattern="{patient_id}_0000.nii.gz",
+    #     mask_name_pattern="{patient_id}.nii.gz",
+    #     scan_path_pattern="scans/{patient_id}",
+    #     mask_path_pattern="masks",
+    #     metadata_files = ['clinical_and_imaging_info.csv'],
+    #     image_modality="MR",
+    #     disease_site='breast'
+    # )
 
-    run_nifti_to_aaura_index(mama_mia_config)
+    recist_data_config = NiftiDatasetConfig(
+        datasource="HCUCH",
+        dataset="recist-dataset",
+        scan_name_pattern="{patient_id}_{uuid}.nii.gz",
+        scan_path_pattern="{region}/{subset}/images",
+        mask_path_pattern="{region}/{subset}/masks",
+        metadata_files=['patients.csv', 'series.json'],
+        image_modality="CT",
+        sample_id_pattern="{dataset}_{patient_id:}")
+
+    run_nifti_to_aaura_index(recist_data_config)
 
