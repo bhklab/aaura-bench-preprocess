@@ -36,7 +36,7 @@ tqdm = ">=4.67.1,<5"
 pydantic = ">=2.12.5,<3"
 
 [pypi-dependencies]
-damply = ">=0.10.0, <0.11"
+damply = "==0.26.0"
 med-imagetools = ">=2.13.0, <3"
 pydanclick = ">=0.5.1, <0.6"
 
