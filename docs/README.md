@@ -6,6 +6,11 @@
 
 **Description:** Preprocessing of datasets for use in the AAuRA Benchmarking tool.
 
+## Note: August 2026, from Katy
+This code is being replaced by the nifti indexer capability in Med-ImageTools and the [ab-testing](https://github.com/bhklab/ab-testing). Useful information that can be extracted from this:
+
+* utils_models.py --> metadata requirements for the dataset index to be fed into Kaitlyn's AAuRA pipelines (nnInteractive, MedSAM2, etc.) 
+
 --------------------------------------
 
 [![pixi-badge](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/prefix-dev/pixi/main/assets/badge/v0.json&style=flat-square)](https://github.com/prefix-dev/pixi)
