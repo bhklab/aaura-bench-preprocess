@@ -194,7 +194,7 @@ def process(dataset:str,
 if __name__ == '__main__':
 	logger.info('Starting data processing for LesionLocator')
 	process(dataset="CVPR_LesionLocator",
-		    metadata_file=Path("images/naming_3.csv"),
+		    metadata_file=Path("images/naming.csv"),
 			anatomy_match_file=Path("metadata/dataset_anatomy_match.csv"),
 			drop_data=['coronacases','NIH-LYMPH'],
 			append_index=False,
