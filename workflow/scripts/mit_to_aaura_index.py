@@ -1,11 +1,11 @@
-from damply import dirs
-from pathlib import Path
-import pandas as pd
 import logging
-from imgtools.coretypes import Mask
+from pathlib import Path
 
-from utils_images import get_rerecist_coords
-from utils_index import make_edges_df, insert_SampleID
+import pandas as pd
+from damply import dirs
+from imgtools.coretypes import Mask
+from utils_images import get_rerecist_coords, mask3D_to_centered_bbox
+from utils_index import insert_SampleID, make_edges_df
 
 logging.basicConfig(
 	level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',
@@ -80,17 +80,21 @@ aaura_index.insert(4, 'mask_voxel_label', 1)
 
 annotation_coords = {}
 largest_slice_index = {}
+centered_bbox_coords = {}
 for sample_index, sample in aaura_index.iterrows():
-    print(sample['id'])
+    logger.info(f"Processing sample: {sample['id']}")
+    # Load in Mask as MedImageTools Mask object
     mask = Mask.from_file(dirs.RAWDATA / sample['mask_path'], metadata={"mask.ndim": 3})
     # Get RERECIST coords for current volume
     rerecist_coords, max_axial_index = get_rerecist_coords(mask)
 
     annotation_coords[sample_index] = rerecist_coords
     largest_slice_index[sample_index] = int(max_axial_index)
+    centered_bbox_coords[sample_index] = mask3D_to_centered_bbox(mask, max_axial_index=max_axial_index)
 
 aaura_index.insert(5, 'annotation_type', 'RERECIST')
 aaura_index.insert(6, 'annotation_coords', annotation_coords)
 aaura_index.insert(7, 'largest_slice_index', largest_slice_index)
+aaura_index.insert(8, 'centered_bbox_coords', centered_bbox_coords)
 
 aaura_index.to_csv(mit_dir_path / f"aaura_{special_prefix}{dataset}{special_suffix}_index.csv", index=False)
