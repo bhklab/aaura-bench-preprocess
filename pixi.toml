@@ -36,7 +36,7 @@ pandas = ">=2.3.3,<3"
 tqdm = ">=4.67.1,<5"
 
 [pypi-dependencies]
-damply = ">=0.10.0, <0.11"
+damply = "==0.26.0"
 med-imagetools = ">=2.13.0, <3"
 
 [tasks]
