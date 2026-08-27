@@ -5,6 +5,7 @@ import numpy as np
 import SimpleITK as sitk
 from damply import dirs
 from imgtools.coretypes import Mask, MedImage
+from imgtools.transforms.functional import bias_correction
 from skimage.measure import regionprops
 
 logger = logging.getLogger(__name__)
@@ -141,45 +142,70 @@ def get_rerecist_coords(mask:MedImage) -> np.array:
 	return rerecist_coords, max_axial_index
 
 
-def image_proc(image_path:Path,
-			   proc_path_stem:str|None = None) -> dict:
-	"""Process image for use in the AAuRA Benchmarking tool 
+
+def mr_proc(scan:sitk.Image) -> sitk.Image:
+	"""Apply bias correction to MR image"""
+	# sitk N4 bias correction requires the image to be a float
+
+	logging.info("Starting bias correction...")
+	scan_float = sitk.Cast(scan, sitk.sitkFloat32)
+
+	return bias_correction(scan_float)
+
+
+
+def scan_proc(scan_path:Path,
+			   proc_path_stem:str|None = None,
+			   modality:str = 'CT') -> dict:
+	"""Process scan for use in the AAuRA Benchmarking tool 
 	
 	Parameters
 	----------
-	image_path : Path
-		Path to the image to process
+	scan_path : Path
+		Path to the scan to process
 	proc_path_stem : str
-		Path to add to dirs.PROCDATA to save image out to.
+		Path to add to dirs.PROCDATA to save scan out to.
 	
 	Returns
 	-------
 	MedImage
-		Processed MedImage object, cast to Int32
+		Processed MedImage object, CT's cast to Int32, MR's to Float32
 	"""
-	# Read in image
-	image = sitk.ReadImage(str(image_path))
-	# Cast image to Int16
-	image = sitk.Cast(image, sitk.sitkInt32)
+	# Read in scan
+	scan_sitk = sitk.ReadImage(str(scan_path))
+
+	if modality == 'CT':
+		# Cast scan to Int16
+		scan_sitk = sitk.Cast(scan_sitk, sitk.sitkInt32)
+	
+	elif modality == 'MR':
+		# Apply bias correction and cast to Float32
+		scan_sitk = mr_proc(scan_sitk)
+		logging.info("Finished bias correction")
+
 	# Convert to MedImage
-	image = MedImage(image)
+	scan = MedImage(scan_sitk)
 
-	if proc_path_stem is not None:
-		proc_image_path = dirs.PROCDATA / proc_path_stem / 'CT.nii.gz'
-		if not proc_image_path.parent.exists():
-			proc_image_path.parent.mkdir(parents=True, exist_ok=True)
-		sitk.WriteImage(image, str(proc_image_path))
-		logger.info(f'Processed image saved at: {proc_image_path}')
+	# Get scan metadata
+	scan_metadata = scan.fingerprint
 
-	# Get image metadata
-	image_metadata = image.fingerprint
 	# Convert size, spacing, origin, direction to tuples/lists for JSON serialization
-	image_metadata["size"] = image.size.to_tuple()
-	image_metadata["spacing"] = image.spacing.to_tuple()
-	image_metadata["origin"] = image.origin.to_tuple()
-	image_metadata["direction"] = image.direction.to_matrix()
+	scan_metadata["size"] = scan.size.to_tuple()
+	scan_metadata["spacing"] = scan.spacing.to_tuple()
+	scan_metadata["origin"] = scan.origin.to_tuple()
+	scan_metadata["direction"] = scan.direction.to_matrix()
 
-	return image_metadata
+	# Save out transformed scan
+	if proc_path_stem is not None:
+		proc_scan_stem = proc_path_stem / f'{modality}.nii.gz'
+		proc_scan_path = dirs.PROCDATA / proc_scan_stem
+		if not proc_scan_path.parent.exists():
+			proc_scan_path.parent.mkdir(parents=True, exist_ok=True)
+		sitk.WriteImage(scan, str(proc_scan_path))
+		logger.info(f'Processed scan saved at: {proc_scan_path}')
+		scan_metadata["scan_path"] = proc_scan_stem
+
+	return scan_metadata
 
 
 def mask_proc(mask_path:Path,
@@ -230,14 +256,6 @@ def mask_proc(mask_path:Path,
 			idx_mask_mi = Mask(idx_mask_sitk, metadata={"mask.ndim": 3})
 			idx_mask_metadata = idx_mask_mi.fingerprint
 			idx_mask_metadata["voxel_label"] = int(volume_label)
-
-			# Write out the individual mask volume
-			if proc_path_stem is not None:
-				proc_mask_path = dirs.PROCDATA / proc_path_stem / f'mask_{volume_idx}.nii.gz'
-				if not proc_mask_path.parent.exists():
-					proc_mask_path.parent.mkdir(parents=True, exist_ok=True)
-				sitk.WriteImage(idx_mask_sitk, str(proc_mask_path))
-				logger.info(f'Processed mask volume {volume_idx} saved at: {proc_mask_path}')
 			
 			# Get RERECIST coords for current volume
 			rerecist_coords, max_axial_index = get_rerecist_coords(idx_mask_mi)
@@ -248,6 +266,15 @@ def mask_proc(mask_path:Path,
 			centered_bbox = mask3D_to_centered_bbox(idx_mask_mi, max_axial_index=max_axial_index)
 			idx_mask_metadata["centered_bbox_coords"] = centered_bbox
 
+			# Write out the individual mask volume
+			if proc_path_stem is not None:
+				proc_mask_stem = proc_path_stem / f'mask_{volume_idx}.nii.gz'
+				proc_mask_path = dirs.PROCDATA / proc_mask_stem
+				if not proc_mask_path.parent.exists():
+					proc_mask_path.parent.mkdir(parents=True, exist_ok=True)
+				sitk.WriteImage(idx_mask_sitk, str(proc_mask_path))
+				logger.info(f'Processed mask volume {volume_idx} saved at: {proc_mask_path}')
+				idx_mask_metadata["mask_path"] = proc_mask_stem
 
 			proc_mask_metadata[f"{volume_idx}"] = idx_mask_metadata
 

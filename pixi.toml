@@ -30,17 +30,22 @@ ipykernel = "*"
 jupyterlab = "*"
 pip = "*"
 simpleitk = ">=2.5.3,<3"
-click = ">=8.3.1,<9"
 matplotlib = ">=3.10.8,<4"
 pandas = ">=2.3.3,<3"
 tqdm = ">=4.67.1,<5"
+pydantic = ">=2.12.5,<3"
 
 [pypi-dependencies]
 damply = "==0.26.0"
 med-imagetools = ">=2.13.0, <3"
+pydanclick = ">=0.5.1, <0.6"
 
 [tasks]
 example_script = {cmd="python $SCRIPTS/example_script.py", description="Run an example script"}
+mit-to-aaura.cmd = ["python", "workflow/scripts/mit_to_aaura_index.py"]
+mit-to-aaura.description = "Convert mit_dataset_index-simple.csv to an aaura_dataset_index.csv"
+
+nifti-to-aaura.cmd = ["python", "workflow/scripts/process.py"]
 
 ############################################## QUALITY ###############################################
 # Quality includes linting, type checking, and formatting
@@ -63,6 +68,7 @@ qc.description = "Quality check: ruff check and format"
 ############################################## DOCS ################################################
 
 [feature.docs.dependencies]
+click = "==8.2.0"
 mkdocs = "*"
 mkdocs-include-markdown-plugin = ">=7.0.0,<8"
 
